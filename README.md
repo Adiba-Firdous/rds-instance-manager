@@ -1,17 +1,20 @@
-# AWS RDS Instance Manager
+# AWS RDS MySQL Instance Manager
 
-A beginner-friendly Python automation project using **boto3** to start, stop,
-and create snapshots of an Amazon RDS DB instance on demand.
+A Python automation project using **boto3** to provision a MySQL Amazon RDS
+instance and manage RDS instances on demand.
 
 ## Features
 
-- Start an RDS DB instance
-- Stop an RDS DB instance
-- Create an RDS DB snapshot
-- Optional `--wait` mode
-- Command-line interface
-- Local action logging in `rds_manager.log`
-- No AWS credentials hard-coded in the source code
+- Provision a new MySQL RDS instance
+- Start an existing RDS instance
+- Stop an existing RDS instance
+- Create a manual RDS snapshot
+- Wait for create/start/stop/snapshot operations to finish
+- CLI with `argparse`
+- Configurable region, log file, and log level
+- BotoCoreError/ClientError handling
+- Type hints and function docstrings
+- AWS credentials are never stored in source code
 
 ## Project structure
 
@@ -23,19 +26,18 @@ rds-instance-manager/
 └── .gitignore
 ```
 
-## 1. Configure AWS credentials
+## 1. Configure AWS
 
-Install and configure the AWS CLI, then verify the active identity:
+Configure the AWS CLI:
 
 ```bash
 aws configure
 aws sts get-caller-identity
 ```
 
-Use an IAM identity with only the permissions needed for this project,
-such as RDS start/stop/snapshot permissions.
+Use an IAM identity with permissions appropriate for the RDS operations.
 
-Do **not** commit AWS access keys or secret keys to GitHub.
+Never commit AWS access keys, secret keys, or database passwords to GitHub.
 
 ## 2. Install dependencies
 
@@ -47,65 +49,94 @@ Windows Git Bash:
 
 ```bash
 source .venv/Scripts/activate
-```
-
-Then:
-
-```bash
 pip install -r requirements.txt
 ```
 
-## 3. Run the script
-
-Replace `my-rds-instance` with your actual RDS DB instance identifier.
-
-### Start
-
-```bash
-python rds_manager.py start --db-instance my-rds-instance --region ap-south-1
-```
-
-### Stop
-
-```bash
-python rds_manager.py stop --db-instance my-rds-instance --region ap-south-1
-```
-
-### Create a snapshot
-
-```bash
-python rds_manager.py snapshot --db-instance my-rds-instance --region ap-south-1
-```
-
-### Wait for completion
-
-Add `--wait`:
-
-```bash
-python rds_manager.py start --db-instance my-rds-instance --region ap-south-1 --wait
-```
-
-## 4. Check the CLI
+## 3. Verify the CLI
 
 ```bash
 python rds_manager.py --help
 ```
 
-## Logging
+## 4. Provision a new MySQL RDS instance
 
-Every action is written to:
+Set the master password through an environment variable so it is not stored
+in the source code or shell history:
 
-```text
-rds_manager.log
+```bash
+export RDS_MASTER_PASSWORD='YourStrongPassword123!'
 ```
 
-The log records the time, operation, status, and AWS error message if an
-operation fails.
+Then:
+
+```bash
+python rds_manager.py create \
+  --db-instance mysql-demo-rds \
+  --master-username admin \
+  --db-class db.t3.micro \
+  --storage 20 \
+  --region ap-south-1 \
+  --wait
+```
+
+On Windows Command Prompt, use:
+
+```cmd
+set RDS_MASTER_PASSWORD=YourStrongPassword123!
+```
+
+The default configuration uses MySQL, 20 GiB of storage, `db.t3.micro`,
+7-day backup retention, gp3 storage, and `PubliclyAccessible=False`.
+
+**AWS costs may apply.** Delete resources when you are finished with testing.
+
+## 5. Start an existing RDS instance
+
+```bash
+python rds_manager.py start \
+  --db-instance mysql-demo-rds \
+  --region ap-south-1 \
+  --wait
+```
+
+## 6. Stop an RDS instance
+
+```bash
+python rds_manager.py stop \
+  --db-instance mysql-demo-rds \
+  --region ap-south-1 \
+  --wait
+```
+
+## 7. Create a snapshot
+
+```bash
+python rds_manager.py snapshot \
+  --db-instance mysql-demo-rds \
+  --region ap-south-1 \
+  --wait
+```
+
+The script generates a timestamped snapshot identifier.
+
+## Logging
+
+Actions are logged to `rds_manager.log` by default.
+
+You can change the log location and level:
+
+```bash
+python rds_manager.py start \
+  --db-instance mysql-demo-rds \
+  --log-file logs/rds.log \
+  --log-level DEBUG
+```
 
 ## Important AWS notes
 
-- Starting/stopping an RDS instance can take several minutes.
-- RDS snapshot creation is asynchronous.
-- AWS charges can apply to RDS instances and stored snapshots.
-- This script is intended for a standard RDS DB instance. Aurora uses
-  cluster-level APIs and would require a separate implementation.
+- RDS creation and state changes are asynchronous.
+- `--wait` uses boto3 waiters to wait for completion.
+- `db.t3.micro` availability depends on the selected region/account.
+- The example creates a standard RDS MySQL instance, not an Aurora cluster.
+- RDS instances and snapshots can incur AWS charges.
+- Review AWS pricing and delete test resources when finished.
